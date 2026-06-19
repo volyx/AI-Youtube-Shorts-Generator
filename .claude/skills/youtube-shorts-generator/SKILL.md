@@ -58,7 +58,11 @@ Run the eight stages in order. Each maps to a module in `shorts_generator/`.
    Each candidate gets `start_time`, `end_time`, `score` 0–100, `title`, `hook_sentence`, `virality_reason`. Aim for 30–75s clips unless content dictates otherwise.
 6. **Dedupe** — collapse overlaps. Rule: if two candidates overlap > 50%, keep the higher score, drop the other.
 7. **Top-N selection** — sort surviving candidates by score, take `num_clips`.
-8. **Vertical auto-crop** (`local/clipper.py`) — render each highlight at `aspect_ratio` in a single GPU-accelerated ffmpeg pass, centring the crop on the speaker from a cheap face sample (OpenCV Haar on downscaled frames). Clips render in parallel (`LOCAL_CROP_WORKERS`).
+8. **Compose vertical (LAYOUT_1)** — render each highlight as a 1080×1920 9:16 clip using **LAYOUT_1**:
+   - **Top 50%** — the **screen-share** panel (slides / terminal / charts), cropped from the source composite and scaled to full width.
+   - **Bottom 50%** — the **two face cams side-by-side** (`hstack`), with **burned-in subtitles** from the transcript across the bottom band.
+
+   One GPU-accelerated `ffmpeg` pass per clip (input-seek cut + crop/scale/`hstack`/`vstack` + `h264_videotoolbox`), rendered in parallel (`LOCAL_CROP_WORKERS`). Subtitles: if this `ffmpeg` lacks libass/`drawtext` (common on Homebrew builds), render each cue to a transparent PNG with Pillow and overlay it with `enable='between(t,a,b)'`; otherwise burn an offset `.srt`/`.ass`. The source composite regions (screen panel, each cam) must be measured once per source layout from a sample frame.
 
 ## Invocation
 
