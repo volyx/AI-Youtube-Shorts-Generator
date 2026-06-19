@@ -43,13 +43,13 @@ def call_ollama_llm(prompt: str) -> str:
 
 
 def call_openai_llm(prompt: str) -> str:
-    """OpenAI Chat Completions backend used by --mode local."""
+    """OpenAI Chat Completions backend (LLM_PROVIDER=openai)."""
     try:
         from openai import OpenAI  # type: ignore
     except ImportError as e:
         raise RuntimeError(
-            "openai is required for --mode local. Install it with:\n"
-            "    uv sync"
+            "openai is required for LLM_PROVIDER=openai. Install it with:\n"
+            "    uv sync --group cloud-llm"
         ) from e
 
     client = OpenAI(api_key=require_openai_key())
@@ -62,7 +62,7 @@ def call_openai_llm(prompt: str) -> str:
 
 
 def call_gemini_llm(prompt: str) -> str:
-    """Gemini backend used by --mode local when LLM_PROVIDER=gemini."""
+    """Gemini backend (LLM_PROVIDER=gemini)."""
     try:
         from google import genai  # type: ignore
     except ImportError as e:

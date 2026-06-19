@@ -5,14 +5,12 @@ description = "Open-source AI YouTube Shorts generator — turns long videos int
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    # Core deps, needed in every mode (used by api mode on its own).
-    "requests>=2.31",
     "python-dotenv>=1.0",
 ]
 
 [dependency-groups]
-# Deps for --mode local (the default mode). Installed by default — see
-# [tool.uv] default-groups below. Skip with `uv sync --no-group local`.
+# On-device pipeline deps. Installed by default — see [tool.uv] default-groups
+# below. Skip with `uv sync --no-group local`.
 local = [
     "yt-dlp>=2024.1.1",
     "opencv-python>=4.8.0",
@@ -33,5 +31,5 @@ cloud-llm = [
 # Application, not a distributable library: don't build/install the project
 # itself, just manage the environment and dependencies.
 package = false
-# `uv sync` installs the local-mode deps by default (local is the default mode).
+# `uv sync` installs the on-device pipeline deps by default.
 default-groups = ["local"]

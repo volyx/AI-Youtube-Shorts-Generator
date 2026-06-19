@@ -155,7 +155,7 @@ def _transcribe_faster_whisper(media_path: str, language: Optional[str]) -> Tupl
         from faster_whisper import WhisperModel  # type: ignore
     except ImportError as e:
         raise RuntimeError(
-            "Neither mlx-whisper nor faster-whisper is available for --mode local.\n"
+            "Neither mlx-whisper nor faster-whisper is available.\n"
             "Install the local deps with:\n"
             "    uv sync"
         ) from e

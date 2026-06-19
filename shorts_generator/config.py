@@ -4,14 +4,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-MUAPI_API_KEY = os.getenv("MUAPI_API_KEY", "").strip()
-MUAPI_BASE_URL = os.getenv("MUAPI_BASE_URL", "https://api.muapi.ai/api/v1").rstrip("/")
-
-POLL_INTERVAL_SECONDS = float(os.getenv("MUAPI_POLL_INTERVAL", "5"))
-POLL_TIMEOUT_SECONDS = float(os.getenv("MUAPI_POLL_TIMEOUT", "600"))
-
-# Local-mode (--mode local) settings — only consulted when running offline.
-# Ranking defaults to a local Ollama model so no cloud key is needed.
+# Highlight-ranking LLM. Defaults to a local Ollama model so no cloud key is
+# needed. Set LLM_PROVIDER=openai|gemini to use a hosted model instead.
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama").strip().lower()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
@@ -36,19 +30,12 @@ LOCAL_VIDEO_ENCODER = os.getenv("LOCAL_VIDEO_ENCODER", "auto")
 LOCAL_CROP_WORKERS = int(os.getenv("LOCAL_CROP_WORKERS", "3"))
 
 
-def require_api_key() -> str:
-    if not MUAPI_API_KEY:
-        raise RuntimeError(
-            "MUAPI_API_KEY is not set. Add it to your .env file or export it as an env var."
-        )
-    return MUAPI_API_KEY
-
-
 def require_openai_key() -> str:
     if not OPENAI_API_KEY:
         raise RuntimeError(
-            "OPENAI_API_KEY is not set. Local mode needs an OpenAI key for highlight ranking. "
-            "Add it to your .env or export it, or switch back to --mode api."
+            "OPENAI_API_KEY is not set. Highlight ranking needs an OpenAI key when "
+            "LLM_PROVIDER=openai. Add it to your .env or export it, or switch "
+            "LLM_PROVIDER back to ollama."
         )
     return OPENAI_API_KEY
 
@@ -56,7 +43,8 @@ def require_openai_key() -> str:
 def require_gemini_key() -> str:
     if not GEMINI_API_KEY:
         raise RuntimeError(
-            "GEMINI_API_KEY is not set. Local mode needs a Gemini key when LLM_PROVIDER=gemini. "
-            "Add it to your .env or export it, or switch LLM_PROVIDER back to openai."
+            "GEMINI_API_KEY is not set. Highlight ranking needs a Gemini key when "
+            "LLM_PROVIDER=gemini. Add it to your .env or export it, or switch "
+            "LLM_PROVIDER back to ollama."
         )
     return GEMINI_API_KEY

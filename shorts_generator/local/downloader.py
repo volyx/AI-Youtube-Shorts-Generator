@@ -17,7 +17,7 @@ def _import_ytdlp():
         import yt_dlp  # type: ignore
     except ImportError as e:
         raise RuntimeError(
-            "yt-dlp is required for --mode local. Install it with:\n"
+            "yt-dlp is required. Install it with:\n"
             "    uv sync"
         ) from e
     return yt_dlp
