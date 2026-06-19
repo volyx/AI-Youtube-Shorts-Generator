@@ -1,10 +1,11 @@
 """End-to-end orchestrator.
 
 Two modes:
-  * mode="api"   (default) — MuAPI does download / transcribe / LLM / autocrop.
-                              Fast, no local deps, pay-per-call.
-  * mode="local"            — yt-dlp + faster-whisper + OpenAI or Gemini + ffmpeg/opencv.
-                              Self-hosted, LLM_PROVIDER selects OpenAI or Gemini.
+  * mode="local" (default)  — yt-dlp + mlx-whisper (Apple GPU) + local LLM
+                              (Ollama by default) + ffmpeg/opencv. Fully on-device,
+                              no cloud keys. LLM_PROVIDER selects ollama/openai/gemini.
+  * mode="api"              — MuAPI does download / transcribe / LLM / autocrop.
+                              No local deps, pay-per-call, needs MUAPI_API_KEY.
 """
 from typing import Dict, List, Optional
 
@@ -93,7 +94,7 @@ def generate_shorts(
     aspect_ratio: str = "9:16",
     download_format: str = "720",
     language: Optional[str] = None,
-    mode: str = "api",
+    mode: str = "local",
 ) -> Dict:
     """Run the full pipeline and return a structured result.
 
@@ -103,8 +104,8 @@ def generate_shorts(
         aspect_ratio: e.g. "9:16", "1:1".
         download_format: source resolution ("360" / "480" / "720" / "1080").
         language: ISO-639-1 to force Whisper language detection.
-        mode: "api" (default, MuAPI) or "local" (yt-dlp + faster-whisper +
-            OpenAI or Gemini + ffmpeg).
+        mode: "local" (default, on-device mlx-whisper + Ollama/local LLM +
+            ffmpeg) or "api" (MuAPI cloud).
 
     Returns:
         {
@@ -115,7 +116,7 @@ def generate_shorts(
           "shorts": [...],           # top `num_clips` with clip_url / local path
         }
     """
-    mode = (mode or "api").lower()
+    mode = (mode or "local").lower()
     if mode == "local":
         return _run_local(youtube_url, num_clips, aspect_ratio, download_format, language)
     if mode == "api":

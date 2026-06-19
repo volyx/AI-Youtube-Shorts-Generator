@@ -33,7 +33,7 @@ If the user gave a URL and nothing else, use defaults and don't block on questio
 
 - Python 3.10+
 - A MuAPI key — set `MUAPI_API_KEY` in `.env`. Powers download, transcription, highlight ranking, and clipping. If missing, stop and ask the user for it; do not invent one.
-- `pip install -r requirements.txt` inside a venv
+- `uv sync` (uv project — creates `.venv` + installs deps; `uv sync --no-group local` for API-only)
 
 If the repo isn't cloned yet, clone `https://github.com/SamurAIGPT/AI-Youtube-Shorts-Generator.git` into the working directory.
 
@@ -64,7 +64,7 @@ Run the eight stages in order. Each maps to a module in `shorts_generator/`.
 CLI (the standard path):
 
 ```bash
-python main.py "<YOUTUBE_URL>" \
+uv run python main.py "<YOUTUBE_URL>" \
     --num-clips 5 \
     --aspect-ratio 9:16 \
     --output-json result.json
@@ -87,7 +87,7 @@ for short in result["shorts"]:
 Batch mode — `urls.txt` with one URL per line:
 
 ```bash
-xargs -a urls.txt -I{} python main.py "{}"
+xargs -a urls.txt -I{} uv run python main.py "{}"
 ```
 
 ## CLI flags reference

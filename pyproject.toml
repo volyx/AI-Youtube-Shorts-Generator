@@ -1,0 +1,37 @@
+[project]
+name = "ai-youtube-shorts-generator"
+version = "0.1.0"
+description = "Open-source AI YouTube Shorts generator — turns long videos into ranked, viral-ready 9:16 clips."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    # Core deps, needed in every mode (used by api mode on its own).
+    "requests>=2.31",
+    "python-dotenv>=1.0",
+]
+
+[dependency-groups]
+# Deps for --mode local (the default mode). Installed by default — see
+# [tool.uv] default-groups below. Skip with `uv sync --no-group local`.
+local = [
+    "yt-dlp>=2024.1.1",
+    "opencv-python>=4.8.0",
+    # mlx-whisper runs on the Apple GPU (Apple Silicon only) and is the default
+    # transcription backend — ~10-20x faster than faster-whisper's CPU path.
+    "mlx-whisper>=0.4.0; platform_system == 'Darwin' and platform_machine == 'arm64'",
+    # CPU/CUDA fallback for non-Apple machines or if mlx isn't available.
+    "faster-whisper>=1.0.0",
+]
+# Optional cloud LLM SDKs for highlight ranking (only if LLM_PROVIDER=openai/gemini).
+# Default ranking uses a local Ollama model or the agent, so these are opt-in.
+cloud-llm = [
+    "openai>=1.0.0",
+    "google-genai>=1.0.0",
+]
+
+[tool.uv]
+# Application, not a distributable library: don't build/install the project
+# itself, just manage the environment and dependencies.
+package = false
+# `uv sync` installs the local-mode deps by default (local is the default mode).
+default-groups = ["local"]

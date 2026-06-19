@@ -1,14 +1,25 @@
-"""Local transcription via faster-whisper.
+"""Local transcription.
+
+Default backend is mlx-whisper, which runs Whisper on the Apple GPU (MLX) —
+~10-20x faster than faster-whisper's CPU path on Apple Silicon. Falls back to
+faster-whisper (CPU/CUDA) elsewhere or when mlx-whisper isn't installed.
 
 Reads a local media file and returns the same shape the highlight generator
 expects: {duration, segments[start, end, text]}.
 """
 import os
+import platform
 import re
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional, Tuple
 
-from ..config import LOCAL_OUTPUT_DIR, LOCAL_WHISPER_DEVICE, LOCAL_WHISPER_MODEL
+from ..config import (
+    LOCAL_OUTPUT_DIR,
+    LOCAL_WHISPER_BACKEND,
+    LOCAL_WHISPER_DEVICE,
+    LOCAL_WHISPER_MODEL,
+    MLX_WHISPER_MODEL,
+)
 
 
 def _transcript_cache_path(media_path: str) -> Path:
@@ -91,8 +102,93 @@ def _resolve_device() -> str:
         return "cpu"
 
 
+def _is_apple_silicon() -> bool:
+    return platform.system() == "Darwin" and platform.machine() == "arm64"
+
+
+def _resolve_backend() -> str:
+    """Decide which Whisper backend to use. 'auto' prefers mlx on Apple Silicon."""
+    if LOCAL_WHISPER_BACKEND in ("mlx", "faster-whisper"):
+        return LOCAL_WHISPER_BACKEND
+    if _is_apple_silicon():
+        try:
+            import mlx_whisper  # type: ignore  # noqa: F401
+            return "mlx"
+        except ImportError:
+            print(
+                "[transcribe/local] mlx-whisper not installed; falling back to "
+                "faster-whisper (CPU). Install mlx-whisper for ~10-20x speedup.",
+                flush=True,
+            )
+    return "faster-whisper"
+
+
+def _transcribe_mlx(media_path: str, language: Optional[str]) -> Tuple[List[Dict], float]:
+    """Transcribe on the Apple GPU via mlx-whisper."""
+    import mlx_whisper  # type: ignore
+
+    print(
+        f"[transcribe/local] mlx-whisper model={MLX_WHISPER_MODEL} (Apple GPU)",
+        flush=True,
+    )
+    result = mlx_whisper.transcribe(
+        media_path,
+        path_or_hf_repo=MLX_WHISPER_MODEL,
+        language=language,
+        verbose=False,
+    )
+    segments = [
+        {
+            "start": float(s["start"]),
+            "end": float(s["end"]),
+            "text": (s.get("text") or "").strip(),
+        }
+        for s in result.get("segments", [])
+    ]
+    duration = segments[-1]["end"] if segments else 0.0
+    return segments, duration
+
+
+def _transcribe_faster_whisper(media_path: str, language: Optional[str]) -> Tuple[List[Dict], float]:
+    """Transcribe on CPU/CUDA via faster-whisper (fallback backend)."""
+    try:
+        from faster_whisper import WhisperModel  # type: ignore
+    except ImportError as e:
+        raise RuntimeError(
+            "Neither mlx-whisper nor faster-whisper is available for --mode local.\n"
+            "Install the local deps with:\n"
+            "    uv sync"
+        ) from e
+
+    device = _resolve_device()
+    compute_type = "float16" if device == "cuda" else "int8"
+    print(
+        f"[transcribe/local] faster-whisper model={LOCAL_WHISPER_MODEL} device={device}",
+        flush=True,
+    )
+
+    model = WhisperModel(LOCAL_WHISPER_MODEL, device=device, compute_type=compute_type)
+    segments_iter, info = model.transcribe(
+        media_path,
+        language=language,
+        beam_size=5,
+        vad_filter=True,
+        condition_on_previous_text=False,
+    )
+
+    segments = [
+        {"start": float(s.start), "end": float(s.end), "text": (s.text or "").strip()}
+        for s in segments_iter
+    ]
+    duration = float(getattr(info, "duration", 0.0)) or (segments[-1]["end"] if segments else 0.0)
+    return segments, duration
+
+
 def transcribe_local(media_path: str, language: Optional[str] = None) -> Dict:
-    """Run faster-whisper on a local file path, caching the result as .srt."""
+    """Transcribe a local file path, caching the result as .srt.
+
+    Uses mlx-whisper (Apple GPU) by default, faster-whisper as fallback.
+    """
     cache_path = _transcript_cache_path(media_path)
     if cache_path.exists():
         source_mtime = os.path.getmtime(media_path)
@@ -107,36 +203,16 @@ def transcribe_local(media_path: str, language: Optional[str] = None) -> Dict:
             )
             return cached
 
-    try:
-        from faster_whisper import WhisperModel  # type: ignore
-    except ImportError as e:
-        raise RuntimeError(
-            "faster-whisper is required for --mode local. Install it with:\n"
-            "    pip install -r requirements-local.txt"
-        ) from e
+    backend = _resolve_backend()
+    if backend == "mlx":
+        try:
+            segments, duration = _transcribe_mlx(media_path, language)
+        except ImportError:
+            print("[transcribe/local] mlx-whisper unavailable; using faster-whisper", flush=True)
+            segments, duration = _transcribe_faster_whisper(media_path, language)
+    else:
+        segments, duration = _transcribe_faster_whisper(media_path, language)
 
-    device = _resolve_device()
-    compute_type = "float16" if device == "cuda" else "int8"
-    print(f"[transcribe/local] faster-whisper model={LOCAL_WHISPER_MODEL} device={device}", flush=True)
-
-    model = WhisperModel(LOCAL_WHISPER_MODEL, device=device, compute_type=compute_type)
-    segments_iter, info = model.transcribe(
-        media_path,
-        language=language,
-        beam_size=5,
-        vad_filter=True,
-        condition_on_previous_text=False,
-    )
-
-    segments = []
-    for s in segments_iter:
-        segments.append({
-            "start": float(s.start),
-            "end": float(s.end),
-            "text": (s.text or "").strip(),
-        })
-
-    duration = float(getattr(info, "duration", 0.0)) or (segments[-1]["end"] if segments else 0.0)
     print(f"[transcribe/local] {len(segments)} segments, {duration:.0f}s of audio", flush=True)
     transcript = {"duration": duration, "segments": segments}
     cache_path = _write_srt_cache(media_path, transcript)

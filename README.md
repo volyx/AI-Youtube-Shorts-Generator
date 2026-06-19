@@ -1,15 +1,12 @@
 # AI YouTube Shorts Generator
 
-[![Powered by MuAPI](https://img.shields.io/badge/Powered%20by-MuAPI-6366f1?style=flat-square&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0tMSAxNHYtNGgtMnYtMmg0djZoLTJ6bTAtOFY2aDJ2MmgtMnoiLz48L3N2Zz4=)](https://muapi.ai?utm_source=github&utm_medium=badge&utm_campaign=ai-youtube-shorts-generator)
-
-
 **The open-source alternative to Opus Clip, Vidyo.ai, Klap, SubMagic, 2short.ai, and other AI clipping tools.** Drop in any long-form YouTube video and get back ranked, viral-ready 9:16 shorts — for free, with no per-clip credits, no watermarks, and full control over the highlight algorithm.
 
 Built for creators, agencies, and developers who don't want to pay $20–$300/month or be capped on minutes processed. Uses GPT-class LLM highlight detection and Whisper transcription to extract the most viral-worthy moments and auto-crop them vertically for TikTok, Reels, and Shorts.
 
 > **Building your own Opus Clip–style SaaS?** Skip the infra and ship on the same APIs that power this repo:
-> - [AI Clipping API](https://muapi.ai/playground/ai-clipping?utm_source=github&utm_medium=readme&utm_campaign=ai-youtube-shorts-generator) — end-to-end clip selection + render
-> - [Auto-Crop API](https://muapi.ai/playground/autocrop?utm_source=github&utm_medium=readme&utm_campaign=ai-youtube-shorts-generator) — vertical reframing only
+> - [AI Clipping API](https://muapi.ai/playground/ai-clipping) — end-to-end clip selection + render
+> - [Auto-Crop API](https://muapi.ai/playground/autocrop) — vertical reframing only
 
 ![longshorts](https://github.com/user-attachments/assets/3f5d1abf-bf3b-475f-8abf-5e253003453a)
 
@@ -51,7 +48,7 @@ Built for creators, agencies, and developers who don't want to pay $20–$300/mo
 
 ## Quick Start (No Setup)
 
-Don't want to self-host? The [AI Clipping API](https://muapi.ai/playground/ai-clipping?utm_source=github&utm_medium=readme&utm_campaign=ai-youtube-shorts-generator) gives you the same Opus Clip–style pipeline as a single HTTP call — no Python, no dependencies, pay-per-clip instead of monthly subscriptions.
+Don't want to self-host? The [AI Clipping API](https://muapi.ai/playground/ai-clipping) gives you the same Opus Clip–style pipeline as a single HTTP call — no Python, no dependencies, pay-per-clip instead of monthly subscriptions.
 
 ---
 
@@ -71,18 +68,22 @@ Don't want to self-host? The [AI Clipping API](https://muapi.ai/playground/ai-cl
    cd AI-Youtube-Shorts-Generator
    ```
 
-2. **Create and activate a virtual environment:**
-   ```bash
-   python3.10 -m venv venv
-   source venv/bin/activate
-   ```
+2. **Install dependencies with uv:**
 
-3. **Install Python dependencies:**
+   This is a [uv](https://docs.astral.sh/uv/) project. A single `uv sync` creates
+   the `.venv` (Python pinned by `.python-version`) and installs everything for
+   the default **local** mode:
    ```bash
-   pip install -r requirements.txt
-   # Only if you plan to use --mode local:
-   pip install -r requirements-local.txt
+   uv sync
    ```
+   No `source .venv/bin/activate` needed — prefix commands with `uv run`.
+
+   Variants:
+   ```bash
+   uv sync --no-group local      # API mode only (skip mlx-whisper/opencv/yt-dlp)
+   uv sync --group cloud-llm     # add OpenAI/Gemini SDKs for cloud LLM ranking
+   ```
+   Add a new dependency with `uv add <pkg>` (use `--group local` / `--group cloud-llm` to target a group).
 
 4. **Set up environment variables:**
 
@@ -107,13 +108,13 @@ Don't want to self-host? The [AI Clipping API](https://muapi.ai/playground/ai-cl
 ### Single video (API mode — default)
 
 ```bash
-python main.py "https://www.youtube.com/watch?v=VIDEO_ID"
+uv run python main.py "https://www.youtube.com/watch?v=VIDEO_ID"
 ```
 
 ### Single video (Local mode — runs offline except for the LLM call)
 
 ```bash
-python main.py "https://www.youtube.com/watch?v=VIDEO_ID" --mode local
+uv run python main.py "https://www.youtube.com/watch?v=VIDEO_ID" --mode local
 ```
 
 Local mode writes the rendered shorts to `./output/short_01.mp4`, `short_02.mp4`, … (override with `LOCAL_OUTPUT_DIR`).
@@ -121,7 +122,7 @@ Local mode writes the rendered shorts to `./output/short_01.mp4`, `short_02.mp4`
 ### With options
 
 ```bash
-python main.py "https://www.youtube.com/watch?v=VIDEO_ID" \
+uv run python main.py "https://www.youtube.com/watch?v=VIDEO_ID" \
     --mode api \
     --num-clips 5 \
     --aspect-ratio 9:16 \
@@ -133,8 +134,8 @@ python main.py "https://www.youtube.com/watch?v=VIDEO_ID" \
 In `--mode local`, you can pass a `file://` URL or a direct filesystem path and skip YouTube entirely:
 
 ```bash
-python main.py "/Users/you/Videos/input.mp4" --mode local
-python main.py "file:///Users/you/Videos/input.mp4" --mode local
+uv run python main.py "/Users/you/Videos/input.mp4" --mode local
+uv run python main.py "file:///Users/you/Videos/input.mp4" --mode local
 ```
 
 The Python API works the same way:
@@ -165,7 +166,7 @@ exists, the app skips `yt-dlp` and reuses the cached video.
 Create a `urls.txt` file with one URL per line, then:
 
 ```bash
-xargs -a urls.txt -I{} python main.py "{}"
+xargs -a urls.txt -I{} uv run python main.py "{}"
 ```
 
 ### CLI flags
@@ -264,8 +265,9 @@ Audio is transcribed by MuAPI's `/openai-whisper` endpoint (server-side `whisper
 ```
 AI-Youtube-Shorts-Generator/
 ├── main.py                       CLI entry point
-├── requirements.txt              core deps (api mode)
-├── requirements-local.txt        optional deps for --mode local
+├── pyproject.toml                deps (core + `local` / `cloud-llm` groups), uv-managed
+├── uv.lock                       pinned, reproducible lockfile
+├── .python-version               pins the interpreter (3.12)
 ├── .env.example
 └── shorts_generator/
     ├── config.py                 env / settings (MuAPI + local LLM + Whisper)
@@ -288,7 +290,7 @@ AI-Youtube-Shorts-Generator/
 The video may have no detectable speech, or it may be in a language Whisper struggles with. Try passing `--language en` (or the correct ISO-639-1 code) to skip auto-detection.
 
 ### Looking for better results?
-The [AI Clipping API](https://muapi.ai/playground/ai-clipping?utm_source=github&utm_medium=readme&utm_campaign=ai-youtube-shorts-generator) uses an improved algorithm that produces higher-quality clips with better highlight detection.
+The [AI Clipping API](https://muapi.ai/playground/ai-clipping) uses an improved algorithm that produces higher-quality clips with better highlight detection.
 
 ## Contributing
 

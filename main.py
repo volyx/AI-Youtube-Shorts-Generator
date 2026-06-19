@@ -24,8 +24,8 @@ def main() -> int:
     parser.add_argument(
         "--mode",
         choices=["api", "local"],
-        default="api",
-        help="api (default, MuAPI) or local (remote URL, file://, or local path + faster-whisper + LLM provider + ffmpeg).",
+        default="local",
+        help="local (default): on-device mlx-whisper + Ollama/local LLM + ffmpeg. api: MuAPI cloud (needs MUAPI_API_KEY).",
     )
     parser.add_argument("--num-clips", type=int, default=3, help="How many shorts to render (default: 3)")
     parser.add_argument("--aspect-ratio", default="9:16", help="Output aspect ratio (default: 9:16)")
