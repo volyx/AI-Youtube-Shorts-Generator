@@ -17,7 +17,15 @@ import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional, Tuple
 
-from ..config import LOCAL_CROP_WORKERS, LOCAL_OUTPUT_DIR, LOCAL_VIDEO_ENCODER
+from ..config import (
+    LAYOUT1_CAM1_CROP,
+    LAYOUT1_CAM2_CROP,
+    LAYOUT1_SCREEN_CROP,
+    LOCAL_CROP_WORKERS,
+    LOCAL_OUTPUT_DIR,
+    LOCAL_VIDEO_ENCODER,
+)
+from . import subtitles
 
 _FACE_SAMPLES = 10          # frames sampled across the clip for crop centring
 _DETECT_WIDTH = 480         # downscale width for face detection
@@ -125,10 +133,47 @@ def crop_clip_local(
     return out_path
 
 
-def crop_highlights_local(
-    source_path: str, highlights: List[Dict],
-    aspect_ratio: str = "9:16", out_dir: Optional[str] = None,
-) -> List[Dict]:
+def compose_layout1_clip(
+    source_path: str, start_time: float, end_time: float, out_path: str,
+    segments: Optional[List[Dict]] = None,
+) -> str:
+    """Render one highlight as LAYOUT_1: screen-share on top, two cams below,
+    burned subtitles at the bottom. One ffmpeg pass (plus PNG cue overlays)."""
+    dur = max(0.0, end_time - start_time)
+    base = (
+        f"[0:v]crop={LAYOUT1_SCREEN_CROP},scale=1080:636,setsar=1[top];"
+        f"[0:v]crop={LAYOUT1_CAM1_CROP},scale=-2:820,crop=540:820,setsar=1[c1];"
+        f"[0:v]crop={LAYOUT1_CAM2_CROP},scale=-2:820,crop=540:820,setsar=1[c2];"
+        "[c1][c2]hstack=inputs=2[cams];"
+        "[top][cams]vstack=inputs=2[stack];"
+        "[stack]pad=1080:1920:0:0:black[base]"
+    )
+    # -ss/-t BEFORE -i limits the source decode to the clip window; otherwise the
+    # trailing -t would attach to the first PNG input and ffmpeg decodes the whole
+    # rest of the source.
+    inputs = ["-ss", f"{start_time:.3f}", "-t", f"{dur:.3f}", "-i", source_path]
+    fg, last = base, "base"
+    if segments:
+        cues = subtitles.cues_for(segments, start_time, end_time)
+        if cues:
+            pngs = subtitles.render_cue_pngs(cues, f"{out_path}.subpng")
+            sub_fg, sub_inputs, last = subtitles.overlay_chain("base", pngs, dur, first_input_index=1)
+            fg += sub_fg
+            inputs += sub_inputs
+
+    cmd = [
+        "ffmpeg", "-y", "-loglevel", "error", *inputs,
+        "-filter_complex", fg, "-map", f"[{last}]", "-map", "0:a",
+        "-t", f"{dur:.3f}",               # cap output duration to the clip window
+        *_video_encoder(), "-c:a", "aac", "-b:a", "160k",
+        out_path,
+    ]
+    subprocess.run(cmd, check=True)
+    return out_path
+
+
+def _render_highlights(source_path, highlights, out_dir, render_one) -> List[Dict]:
+    """Shared parallel driver for the per-clip renderers."""
     out_dir = out_dir or LOCAL_OUTPUT_DIR
     os.makedirs(out_dir, exist_ok=True)
     results: List[Dict] = [None] * len(highlights)  # type: ignore
@@ -137,8 +182,7 @@ def crop_highlights_local(
     def _one(i: int, h: Dict) -> Dict:
         out_path = os.path.join(out_dir, f"short_{i + 1:02d}.mp4")
         try:
-            crop_clip_local(source_path, float(h["start_time"]), float(h["end_time"]),
-                            aspect_ratio, out_path)
+            render_one(i, h, out_path)
             return {**h, "clip_url": out_path}
         except Exception as e:
             return {**h, "clip_url": None, "error": str(e)}
@@ -153,3 +197,25 @@ def crop_highlights_local(
             tag = "ok" if results[i].get("clip_url") else f"FAILED {results[i].get('error')}"
             print(f"[clip/local] {i + 1}/{len(highlights)} {tag}", flush=True)
     return results
+
+
+def crop_highlights_local(
+    source_path: str, highlights: List[Dict],
+    aspect_ratio: str = "9:16", out_dir: Optional[str] = None,
+) -> List[Dict]:
+    """Generic single-cam vertical crop (speaker-centred) for each highlight."""
+    def render(i, h, out_path):
+        crop_clip_local(source_path, float(h["start_time"]), float(h["end_time"]),
+                        aspect_ratio, out_path)
+    return _render_highlights(source_path, highlights, out_dir, render)
+
+
+def compose_layout1_highlights(
+    source_path: str, highlights: List[Dict],
+    out_dir: Optional[str] = None, segments: Optional[List[Dict]] = None,
+) -> List[Dict]:
+    """LAYOUT_1 (screen + two cams + subtitles) for each highlight."""
+    def render(i, h, out_path):
+        compose_layout1_clip(source_path, float(h["start_time"]), float(h["end_time"]),
+                             out_path, segments=segments)
+    return _render_highlights(source_path, highlights, out_dir, render)

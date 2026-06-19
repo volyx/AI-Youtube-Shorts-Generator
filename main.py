@@ -16,15 +16,22 @@ if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 from shorts_generator import generate_shorts
+from shorts_generator.config import OUTRO_PATH
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="AI YouTube Shorts Generator")
     parser.add_argument("url", help="YouTube URL, file:// URL, or local file path")
     parser.add_argument("--num-clips", type=int, default=3, help="How many shorts to render (default: 3)")
-    parser.add_argument("--aspect-ratio", default="9:16", help="Output aspect ratio (default: 9:16)")
+    parser.add_argument("--aspect-ratio", default="9:16", help="Output aspect ratio for --layout crop (default: 9:16)")
     parser.add_argument("--format", default="720", help="Source download resolution: 360 / 480 / 720 / 1080 (default: 720)")
     parser.add_argument("--language", default=None, help="Force Whisper language code, e.g. 'en' (default: auto-detect)")
+    parser.add_argument("--layout", choices=["crop", "layout1"], default="crop",
+                        help="crop: speaker-centred vertical crop. layout1: screen-share on top, two cams + burned subtitles below.")
+    parser.add_argument("--no-subs", dest="subs", action="store_false",
+                        help="Disable burned subtitles (layout1 only)")
+    parser.add_argument("--outro", default=OUTRO_PATH or None,
+                        help="Path to an outro mp4 appended to every short (default: $OUTRO_PATH)")
     parser.add_argument("--output-json", default=None, help="Write the full result JSON to this path")
     args = parser.parse_args()
 
@@ -35,6 +42,9 @@ def main() -> int:
             aspect_ratio=args.aspect_ratio,
             download_format=args.format,
             language=args.language,
+            layout=args.layout,
+            subs=args.subs,
+            outro=args.outro,
         )
     except Exception as e:
         print(f"\nFAILED: {e}", file=sys.stderr)

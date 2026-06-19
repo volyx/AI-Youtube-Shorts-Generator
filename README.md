@@ -107,6 +107,18 @@ uv run python main.py "https://www.youtube.com/watch?v=VIDEO_ID" \
     --output-json result.json
 ```
 
+### Layouts
+
+- `--layout crop` (default) — speaker-centred vertical crop.
+- `--layout layout1` — screen-share on top, two face cams side-by-side below, with burned-in subtitles. Set the source crop regions via `LAYOUT1_SCREEN_CROP` / `LAYOUT1_CAM1_CROP` / `LAYOUT1_CAM2_CROP` (measure once per source). `--no-subs` disables captions.
+
+Append a channel outro to every short with `--outro path/to/outro.mp4` (or set `OUTRO_PATH`):
+
+```bash
+uv run python main.py "/Users/you/Videos/talk.mov" \
+    --layout layout1 --outro assets/outro.mp4 --num-clips 10
+```
+
 ### Local file or path
 
 Pass a `file://` URL or a direct filesystem path and skip YouTube entirely:
@@ -151,9 +163,12 @@ xargs -a urls.txt -I{} uv run python main.py "{}"
 | Flag | Default | Notes |
 |------|---------|-------|
 | `--num-clips` | `3` | How many shorts to render |
-| `--aspect-ratio` | `9:16` | Any ratio; `9:16` for TikTok/Reels, `1:1` for square |
+| `--aspect-ratio` | `9:16` | Any ratio; `9:16` for TikTok/Reels, `1:1` for square (layout `crop`) |
 | `--format` | `720` | Source download resolution: `360` / `480` / `720` / `1080` |
 | `--language` | auto | Force Whisper language code (e.g. `en`) |
+| `--layout` | `crop` | `crop` (speaker-centred) or `layout1` (screen + two cams + subs) |
+| `--no-subs` | — | Disable burned subtitles (layout1) |
+| `--outro` | `$OUTRO_PATH` | Append this mp4 to the end of every short |
 | `--output-json` | — | Dump the full result (transcript + all candidates) to a file |
 
 ## How It Works

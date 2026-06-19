@@ -29,6 +29,22 @@ LOCAL_OUTPUT_DIR = os.getenv("LOCAL_OUTPUT_DIR", "output")
 LOCAL_VIDEO_ENCODER = os.getenv("LOCAL_VIDEO_ENCODER", "auto")
 LOCAL_CROP_WORKERS = int(os.getenv("LOCAL_CROP_WORKERS", "3"))
 
+# LAYOUT_1 (--layout layout1): screen-share on top, two face cams side-by-side
+# below, burned subtitles at the bottom. Crop boxes are "W:H:X:Y" against the
+# SOURCE composite — measure once per source from a sample frame. Defaults match
+# the 1920x1080 OBS layout used by the "Staff Engineer" stream.
+LAYOUT1_SCREEN_CROP = os.getenv("LAYOUT1_SCREEN_CROP", "1360:800:0:140")
+LAYOUT1_CAM1_CROP = os.getenv("LAYOUT1_CAM1_CROP", "560:420:1360:30")
+LAYOUT1_CAM2_CROP = os.getenv("LAYOUT1_CAM2_CROP", "560:370:1360:455")
+
+# Burned-subtitle styling (rendered with Pillow; works without libass/drawtext).
+SUB_FONT = os.getenv("SUB_FONT", "/System/Library/Fonts/Supplemental/Arial Bold.ttf")
+SUB_FONT_SIZE = int(os.getenv("SUB_FONT_SIZE", "50"))
+SUB_Y_CENTER = int(os.getenv("SUB_Y_CENTER", "1690"))  # caption block centre, px
+
+# Outro appended to the end of every short (empty = skip). CLI --outro overrides.
+OUTRO_PATH = os.getenv("OUTRO_PATH", "").strip()
+
 
 def require_openai_key() -> str:
     if not OPENAI_API_KEY:
