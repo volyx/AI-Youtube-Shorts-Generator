@@ -40,7 +40,7 @@ If the repo isn't cloned yet, clone `https://github.com/volyx/AI-Youtube-Shorts-
 
 ## Pipeline (what to execute)
 
-Run the eight stages in order. Each maps to a module in `shorts_generator/`.
+Run the nine stages in order. Most map to a module in `shorts_generator/`.
 
 1. **Download** (`local/downloader.py`) — pull the source video at the requested resolution (`360`/`480`/`720`/`1080`, default `720`); local file paths are used as-is.
 2. **Transcribe** (`local/transcriber.py`) — `mlx-whisper` runs Whisper on-device on the Apple GPU (faster-whisper CPU fallback) and returns timestamped segments. No network, no per-minute billing.
@@ -63,6 +63,7 @@ Run the eight stages in order. Each maps to a module in `shorts_generator/`.
    - **Bottom 50%** — the **two face cams side-by-side** (`hstack`), with **burned-in subtitles** from the transcript across the bottom band.
 
    One GPU-accelerated `ffmpeg` pass per clip (input-seek cut + crop/scale/`hstack`/`vstack` + `h264_videotoolbox`), rendered in parallel (`LOCAL_CROP_WORKERS`). Subtitles: if this `ffmpeg` lacks libass/`drawtext` (common on Homebrew builds), render each cue to a transparent PNG with Pillow and overlay it with `enable='between(t,a,b)'`; otherwise burn an offset `.srt`/`.ass`. The source composite regions (screen panel, each cam) must be measured once per source layout from a sample frame.
+9. **Append the outro (always)** — concat `outro.mp4` (the channel CTA card) onto the end of **every** rendered short. Use the `concat` filter, normalizing audio (the outro is mono 48k, shorts are stereo). Do this for each short, never skip it. The final clips-with-outro are the deliverable.
 
 ## Invocation
 

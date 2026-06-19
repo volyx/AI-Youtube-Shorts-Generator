@@ -13,7 +13,7 @@ IN_DIR = os.path.join(BASE, "shorts_screen_subs")
 OUT_DIR = os.path.join(BASE, "shorts_final")
 OUTRO = "/Users/volyx/.claude/skills/youtube-shorts/outro.mp4"
 
-CLIPS = ["short_01.mp4", "short_02.mp4", "short_03.mp4"]
+CLIPS = [f"short_{n:02d}.mp4" for n in range(1, 11)]
 
 FILTER = (
     "[0:v]fps=30,scale=1080:1920,setsar=1,format=yuv420p,settb=AVTB[v0];"

@@ -27,11 +27,28 @@ FSIZE = 50
 MAXW = 960
 font = ImageFont.truetype(FONT, FSIZE)
 
-# (num, start, end) — the agent-ranked top 3 highlights.
+# Agent-ranked top 10 highlights: (num, start, end, score, title, hook).
 CLIPS = [
-    (1, 3504.5, 3540.1),
-    (2, 5856.5, 5902.5),
-    (3, 7472.2, 7514.6),
+    (1, 3504.5, 3540.1, 92, "Why devs trash AI coding: fear of losing their jobs",
+     "Это боязнь потерять работу и желание сохранить статус-кво программистов."),
+    (2, 5856.5, 5902.5, 90, "A DB built with Claude only 3x slower than DuckDB",
+     "Раньше это было 12 секунд, теперь GpointDB отрабатывает за 183 миллисекунды."),
+    (3, 7472.2, 7514.6, 89, "Spec-driven development is BS",
+     "Спек-дривен-девелопмент — это какая-то чушь, там нет никакого driven-development."),
+    (4, 6058.3, 6091.0, 88, "The agent researched me and built my landing page",
+     "Мой OpenClaw агент провёл ресерч меня как автора и вставил ссылки в лендос."),
+    (5, 6431.5, 6491.1, 87, "The human is the bottleneck between software and Claude",
+     "Ты начинаешь быть узким местом — этот человек между софтом и Клодом не работает."),
+    (6, 6863.0, 6911.1, 86, "My autonomous agent has its own VM and GitHub account",
+     "OpenClaw — автономный агент: отдельная виртуалка, отдельный GitHub аккаунт, только PR-ы."),
+    (7, 3105.5, 3153.0, 85, "Claude estimates in human-days because it trained on humans",
+     "Один шаг займёт 3-5 дней — он оценивает как человек, потому что обучался на людях."),
+    (8, 1325.8, 1363.1, 84, "The prompt is the only thing that matters",
+     "The prompt — это единственный промпт, который реально имеет значение."),
+    (9, 2331.9, 2360.6, 83, "With Claude, writing your own tooling is a no-brainer",
+     "Когда есть такая мощь, как Клод, писать свой тулинг — сам Бог велел."),
+    (10, 7296.0, 7337.2, 82, "Claude pushed me to Caddy — wait, was that an ad?",
+     "Клод сам предложил Caddy вместо nginx. А может, это реклама была?"),
 ]
 
 # Screen fit-width on top, both cams filled below, subtitle band at the bottom.
@@ -125,9 +142,18 @@ def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     segments = json.load(open(TRANSCRIPT))["segments"]
     only = [int(x) for x in sys.argv[1:]] or [c[0] for c in CLIPS]
-    for num, start, end in CLIPS:
-        if num in only:
-            render(num, start, end, segments)
+    shorts = []
+    for num, start, end, score, title, hook in CLIPS:
+        if num not in only:
+            continue
+        render(num, start, end, segments)
+        shorts.append({
+            "rank": num, "score": score, "title": title, "hook_sentence": hook,
+            "start_time": start, "end_time": end, "duration": round(end - start, 1),
+            "clip_url": os.path.join(OUT_DIR, f"short_{num:02d}.mp4"),
+        })
+    with open(os.path.join(OUT_DIR, "ranking.json"), "w") as f:
+        json.dump(shorts, f, ensure_ascii=False, indent=2)
     print("ALL DONE")
 
 

@@ -5,12 +5,10 @@ t = json.load(open("/Users/volyx/Movies/2026-05-21 19-12-30/transcript.json"))
 segs = t["segments"]
 
 RANGES = [
-    ("job-fear", 3495, 3550),
-    ("benchmark-payoff", 5855, 5910),
-    ("spec-driven-bs", 7466, 7520),
-    ("claude-human-days", 3100, 3160),
-    ("human-bottleneck", 6425, 6495),
-    ("openclaw-research", 6045, 6095),
+    ("the-prompt-is-all", 1320, 1372),
+    ("write-your-own-tooling", 2288, 2342),
+    ("openclaw-agent-setup", 6864, 6914),
+    ("caddy-ad", 7282, 7350),
 ]
 
 for name, a, b in RANGES:
