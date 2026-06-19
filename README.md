@@ -110,7 +110,7 @@ uv run python main.py "https://www.youtube.com/watch?v=VIDEO_ID" \
 ### Layouts
 
 - `--layout crop` (default) — speaker-centred vertical crop.
-- `--layout layout1` — screen-share on top, two face cams side-by-side below, with burned-in subtitles. Set the source crop regions via `LAYOUT1_SCREEN_CROP` / `LAYOUT1_CAM1_CROP` / `LAYOUT1_CAM2_CROP` (measure once per source). `--no-subs` disables captions.
+- `--layout layout1` — screen-share on top, two face cams side-by-side below, with burned-in subtitles. Set the source crop regions via `LAYOUT1_SCREEN_CROP` / `LAYOUT1_CAM1_CROP` / `LAYOUT1_CAM2_CROP` (measure once per source). `--no-subs` disables captions. Each cam is face-detected and zoomed so both speakers' heads come out the same size (`LAYOUT1_FACE_FRAC`, ≈0.38; set `LAYOUT1_NORMALIZE_HEADS=0` to disable).
 
 Append a channel outro to every short with `--outro path/to/outro.mp4` (or set `OUTRO_PATH`):
 

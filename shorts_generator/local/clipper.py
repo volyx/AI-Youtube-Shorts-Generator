@@ -20,6 +20,8 @@ from typing import Dict, List, Optional, Tuple
 from ..config import (
     LAYOUT1_CAM1_CROP,
     LAYOUT1_CAM2_CROP,
+    LAYOUT1_FACE_FRAC,
+    LAYOUT1_NORMALIZE_HEADS,
     LAYOUT1_SCREEN_CROP,
     LOCAL_CROP_WORKERS,
     LOCAL_OUTPUT_DIR,
@@ -29,6 +31,7 @@ from . import subtitles
 
 _FACE_SAMPLES = 10          # frames sampled across the clip for crop centring
 _DETECT_WIDTH = 480         # downscale width for face detection
+_LAYOUT1_CELL_W, _LAYOUT1_CELL_H = 540, 820   # each cam cell in the LAYOUT_1 grid
 
 
 def _ratio(aspect_ratio: str) -> float:
@@ -133,21 +136,91 @@ def crop_clip_local(
     return out_path
 
 
+def _parse_box(spec: str) -> Tuple[int, int, int, int]:
+    """Parse a 'W:H:X:Y' crop spec into ints."""
+    w, h, x, y = (int(float(v)) for v in spec.split(":"))
+    return w, h, x, y
+
+
+def _detect_face_in_box(
+    source_path: str, start: float, end: float, box: Tuple[int, int, int, int],
+):
+    """Median (cx, cy, face_height) of the largest face inside `box`, in source
+    pixels, sampled across the clip. None if OpenCV/faces are unavailable."""
+    try:
+        import cv2  # type: ignore
+    except ImportError:
+        return None
+    cap = cv2.VideoCapture(source_path)
+    if not cap.isOpened():
+        return None
+    cascade = cv2.CascadeClassifier(
+        cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+    bw, bh, bx, by = box
+    dur = max(0.0, end - start)
+    samples = []
+    for i in range(_FACE_SAMPLES):
+        t = start + dur * (i + 0.5) / _FACE_SAMPLES
+        cap.set(cv2.CAP_PROP_POS_MSEC, t * 1000.0)
+        ok, frame = cap.read()
+        if not ok:
+            continue
+        sub = frame[by:by + bh, bx:bx + bw]
+        if sub.size == 0:
+            continue
+        gray = cv2.cvtColor(sub, cv2.COLOR_BGR2GRAY)
+        faces = cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(40, 40))
+        if len(faces):
+            fx, fy, fw, fh = max(faces, key=lambda f: f[2] * f[3])
+            samples.append((bx + fx + fw / 2, by + fy + fh / 2, float(fh)))
+    cap.release()
+    if not samples:
+        return None
+    samples.sort(key=lambda s: s[2])
+    return samples[len(samples) // 2]
+
+
+def _cam_cell_filter(label: str, box: Tuple[int, int, int, int], face) -> str:
+    """Filter for one cam cell. When a face is found and head-normalization is on,
+    zoom so the face fills LAYOUT1_FACE_FRAC of the cell height (equal head sizes);
+    otherwise fill the cell from the whole cam box."""
+    bw, bh, bx, by = box
+    cw, ch = _LAYOUT1_CELL_W, _LAYOUT1_CELL_H
+    if face and LAYOUT1_NORMALIZE_HEADS:
+        cx, cy, fh = face
+        crop_h = min(fh / LAYOUT1_FACE_FRAC, float(bh))
+        crop_w = crop_h * cw / ch
+        if crop_w > bw:                       # cam box too narrow — clamp by width
+            crop_w, crop_h = float(bw), bw * ch / cw
+        x0 = min(max(cx - crop_w / 2, bx), bx + bw - crop_w)
+        y0 = min(max(cy - crop_h / 2, by), by + bh - crop_h)
+        cwi, chi = int(crop_w) & ~1, int(crop_h) & ~1
+        x0i, y0i = int(x0) & ~1, int(y0) & ~1
+        return f"[0:v]crop={cwi}:{chi}:{x0i}:{y0i},scale={cw}:{ch},setsar=1[{label}]"
+    return f"[0:v]crop={bw}:{bh}:{bx}:{by},scale=-2:{ch},crop={cw}:{ch},setsar=1[{label}]"
+
+
 def compose_layout1_clip(
     source_path: str, start_time: float, end_time: float, out_path: str,
     segments: Optional[List[Dict]] = None,
 ) -> str:
     """Render one highlight as LAYOUT_1: screen-share on top, two cams below,
-    burned subtitles at the bottom. One ffmpeg pass (plus PNG cue overlays)."""
+    burned subtitles at the bottom. One ffmpeg pass (plus PNG cue overlays).
+
+    When LAYOUT1_NORMALIZE_HEADS is set, each cam is zoomed so both speakers'
+    heads come out the same size."""
     dur = max(0.0, end_time - start_time)
-    base = (
-        f"[0:v]crop={LAYOUT1_SCREEN_CROP},scale=1080:636,setsar=1[top];"
-        f"[0:v]crop={LAYOUT1_CAM1_CROP},scale=-2:820,crop=540:820,setsar=1[c1];"
-        f"[0:v]crop={LAYOUT1_CAM2_CROP},scale=-2:820,crop=540:820,setsar=1[c2];"
-        "[c1][c2]hstack=inputs=2[cams];"
-        "[top][cams]vstack=inputs=2[stack];"
-        "[stack]pad=1080:1920:0:0:black[base]"
-    )
+    box1, box2 = _parse_box(LAYOUT1_CAM1_CROP), _parse_box(LAYOUT1_CAM2_CROP)
+    face1 = _detect_face_in_box(source_path, start_time, end_time, box1) if LAYOUT1_NORMALIZE_HEADS else None
+    face2 = _detect_face_in_box(source_path, start_time, end_time, box2) if LAYOUT1_NORMALIZE_HEADS else None
+    base = ";".join([
+        f"[0:v]crop={LAYOUT1_SCREEN_CROP},scale=1080:636,setsar=1[top]",
+        _cam_cell_filter("c1", box1, face1),
+        _cam_cell_filter("c2", box2, face2),
+        "[c1][c2]hstack=inputs=2[cams]",
+        "[top][cams]vstack=inputs=2[stack]",
+        "[stack]pad=1080:1920:0:0:black[base]",
+    ])
     # -ss/-t BEFORE -i limits the source decode to the clip window; otherwise the
     # trailing -t would attach to the first PNG input and ffmpeg decodes the whole
     # rest of the source.

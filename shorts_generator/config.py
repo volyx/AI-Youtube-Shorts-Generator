@@ -36,6 +36,11 @@ LOCAL_CROP_WORKERS = int(os.getenv("LOCAL_CROP_WORKERS", "3"))
 LAYOUT1_SCREEN_CROP = os.getenv("LAYOUT1_SCREEN_CROP", "1360:800:0:140")
 LAYOUT1_CAM1_CROP = os.getenv("LAYOUT1_CAM1_CROP", "560:420:1360:30")
 LAYOUT1_CAM2_CROP = os.getenv("LAYOUT1_CAM2_CROP", "560:370:1360:455")
+# Normalize head sizes: zoom each cam (within its box) so the detected face fills
+# LAYOUT1_FACE_FRAC of the cell height, making both speakers' heads the same size.
+# Needs OpenCV; falls back to filling the cell if no face is found. Set 0 to disable.
+LAYOUT1_NORMALIZE_HEADS = os.getenv("LAYOUT1_NORMALIZE_HEADS", "1").strip() not in ("0", "false", "")
+LAYOUT1_FACE_FRAC = float(os.getenv("LAYOUT1_FACE_FRAC", "0.38"))
 
 # Burned-subtitle styling (rendered with Pillow; works without libass/drawtext).
 SUB_FONT = os.getenv("SUB_FONT", "/System/Library/Fonts/Supplemental/Arial Bold.ttf")
